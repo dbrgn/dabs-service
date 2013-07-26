@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function, division, absolute_import, unicode_literals
 
-import os.path
+import os
 import urllib
 from datetime import date, timedelta
 
@@ -10,7 +10,7 @@ from bottle import route, run, request, response, static_file
 from .extraction import extract_map, extract_text, ExtractionError
 
 
-TEMPPATH = os.path.abspath('.')
+TEMPPATH = os.environ.get('TEMPPATH', os.path.abspath('.'))
 
 
 class TargetDay(object):
@@ -153,4 +153,8 @@ def tomorrow(target):
 
 
 if __name__ == '__main__':
-    run(host='0.0.0.0', port=8000)
+    if os.environ.get('USE_GUNICORN', '').lower() in ['y', 'yes', '1', 'true']:
+        port = int(os.environ.get('PORT', 8000))
+        run(server='gunicorn', host='0.0.0.0', port=port)
+    else:
+        run(host='0.0.0.0', port=8000)
