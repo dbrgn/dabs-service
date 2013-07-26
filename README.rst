@@ -9,6 +9,9 @@ You can find the DABS here: http://www.skyguide.ch/en/nc/services/aim-services/d
 There are two parts that can be returned: The map (page 1) and the tabular data
 (page 2).
 
+The service is powered by `bottle <http://bottlepy.org/>`__ and `tablib
+<http://python-tablib.org/>`__.
+
 
 Usage
 -----
@@ -65,6 +68,17 @@ Example
     IN VICINITY OF SAANEN"
     W0837/13,0600 - 2000,GND,FL100,ZWEISIMMEN,463311N 0072250E,9.3 KM/5.0 NM,"INTENSE GLIDER ACTIVITY
     IN VICINITY OF ZWEISIMMEN"
+
+
+Running the Server
+------------------
+
+To start the development server, simply run the following command::
+
+    $ python -m dabs_service.server
+
+In production it is recommended to use a more robust WSGI server than the
+builtin bottle development server.
 
 
 Testing
