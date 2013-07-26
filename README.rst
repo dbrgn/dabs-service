@@ -4,6 +4,8 @@ dabs-service
 This is a small webservice that downloads today's and tomorrow's DABS (Daily
 Airspace Bulletin Switzerland) from Skyguide and tries to parse it.
 
+You can find the DABS here: http://www.skyguide.ch/en/nc/services/aim-services/dabs/
+
 There are two parts that can be returned: The map (page 1) and the tabular data
 (page 2).
 
