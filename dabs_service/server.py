@@ -126,6 +126,10 @@ def today(contenttype):
         elif mime in ['text/yaml', 'text/x-yaml', 'application/yaml', 'application/x-yaml']:
             response.content_type = 'text/x-yaml; charset=utf-8'
             return data.yaml
+        # CSV
+        elif mime == 'text/csv':
+            response.content_type = 'text/csv; charset=utf-8'
+            return data.csv
         # TSV
         elif mime == 'application/tsv':
             response.content_type = 'text/tsv; charset=utf-8'
@@ -144,10 +148,6 @@ def today(contenttype):
             response.content_type = 'application/vnd.openxmlformats-officedocument.' + \
                                     'spreadsheetml.sheet; charset=utf-8'
             return data.xlsx
-        # CSV
-        elif mime == 'text/csv':
-            response.content_type = 'text/csv; charset=utf-8'
-            return data.csv
         # HTML (fallback)
         else:
             response.content_type = 'text/html; charset=utf-8'
