@@ -93,7 +93,7 @@ simply issue the following command in the repo root::
 Author
 ------
 
-Hi, I'm Danilo Bargen. As a paraglider pilot, I find this kind of information
+Hi, I'm Danilo Bargen. As a paragliding pilot, I find this kind of information
 useful and important, but the PDF version of the DABS by Skyguide is not too
 convenient on the go. The service attempts to provide better data for developers
 of mobile apps.

@@ -2,9 +2,10 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
 import re
-import urllib
+import os.path
 import subprocess
-from datetime import date
+import urllib
+from datetime import date, timedelta
 
 import tablib
 from bottle import route, run, request, response, static_file
@@ -13,9 +14,36 @@ from bottle import route, run, request, response, static_file
 TEMPPATH = '.'
 
 
+class TargetDay(object):
+    """A wrapper for the target day."""
+
+    def __init__(self, name):
+        assert name in ['today', 'tomorrow']
+        self._name = name
+        self._dateobj = date.today()
+        if name == 'tomorrow':
+            self._dateobj += timedelta(days=1)
+
+    @property
+    def date(self):
+        return self._dateobj
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def datestring(self):
+        return self.date.strftime('%Y%m%d')
+
+
+def get_filepath(day):
+    return os.path.join(TEMPPATH, 'DABS_{0}.pdf'.format(day.datestring))
+
+
 def extract_map(infile, outfile):
     subprocess.check_call(['mudraw', '-r', '150', '-o', outfile, infile, '1'])
-    return outfile
+    return True
 
 
 def extract_text(infile):
@@ -98,25 +126,53 @@ def extract_text(infile):
     return tablib.Dataset(*rows, headers=headers)
 
 
-@route('/')
-def index():
-    return 'DABS webservice'
+def download_dabs(day):
+    """Download the DABS PDF.
+
+    Args:
+        target_date:
+            Either ``today`` or ``tomorrow``.
+
+    Returns:
+        The filepath of the DABS PDF.
+
+    """
+    filepath = get_filepath(day)
+    url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.datestring}.pdf'
+    urllib.urlretrieve(url.format(day=day), filepath)
+    return filepath
 
 
-@route('/today/<contenttype>/')
-def today(contenttype):
-    # Fetch today's DABS from Skyguide
-    datestring = date.today().strftime('%Y%m%d')
-    filename = 'DABS_{0}.pdf'.format(datestring)
-    url = 'http://www.skyguide.ch/fileadmin/dabs-today/' + filename
-    urllib.urlretrieve(url.format(datestring), filename)
+def process_dabs(day, target, filepath=None):
+    """Process the specified DABS file. Return response content.
 
-    # Render image of first page
-    if contenttype == 'map':
-        map_filename = extract_map(filename, 'map_{0}.png'.format(datestring))
+    Args:
+        day:
+            A ``TargetDay`` instance.
+        target:
+            Either ``map`` or ``text``.
+        filepath:
+            Optional. Filepath to the DABS PDF file. If no ``filepath`` is
+            specified, it is calculated using the ``day`` parameter.
+
+    Returns:
+        Response content. Content type is also set using the global response
+        object.
+
+    """
+    # If necessary, obtail filepath
+    if filepath is None:
+        filepath = get_filepath(day)
+
+    # Handle map extraction
+    if target == 'map':
+        map_filename = 'map_{0}.png'.format(day.datestring)
+        extract_map(filepath, os.path.join(TEMPPATH, map_filename))
         return static_file(map_filename, root=TEMPPATH, mimetype='image/png')
-    elif contenttype == 'text':
-        data = extract_text(filename)
+
+    # Handle text extraction
+    elif target == 'text':
+        data = extract_text(filepath)
         mime = request.headers.get('Accept').lower()
         # JSON
         if mime == 'application/json':
@@ -155,7 +211,26 @@ def today(contenttype):
 
     else:
         response.status = 400
-        return 'Invalid content type: "{0}"'.format(contenttype)
+        return 'Invalid target: "{0}"'.format(target)
+
+
+@route('/')
+def index():
+    return 'DABS webservice'
+
+
+@route('/today/<target>/')
+def today(target):
+    day = TargetDay('today')
+    filepath = download_dabs(day)
+    return process_dabs(day, target, filepath)
+
+
+@route('/tomorrow/<target>/')
+def tomorrow(target):
+    day = TargetDay('tomorrow')
+    filepath = download_dabs(day)
+    return process_dabs(day, target, filepath)
 
 
 if __name__ == '__main__':
