@@ -3,8 +3,9 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 
 import os
 import urllib
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
+import pytz
 from bottle import route, run, request, response, static_file
 
 from .extraction import extract_map, extract_text, ExtractionError
@@ -19,7 +20,8 @@ class TargetDay(object):
     def __init__(self, name):
         assert name in ['today', 'tomorrow']
         self._name = name
-        self._dateobj = date.today()
+        swiss_timezone = pytz.timezone('Europe/Zurich')
+        self._dateobj = datetime.now(swiss_timezone).date()
         if name == 'tomorrow':
             self._dateobj += timedelta(days=1)
 
