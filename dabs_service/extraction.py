@@ -28,7 +28,7 @@ def extract_map(infile, outfile):
             Raised if extracting image from PDF file using mudraw fails.
 
     """
-    subprocess.check_call(['mudraw', '-r', '150', '-o', outfile, infile, '1'])
+    subprocess.check_call(['mudraw', '-w', '1920', '-h', '1920', '-o', outfile, infile, '1'])
     return True
 
 
