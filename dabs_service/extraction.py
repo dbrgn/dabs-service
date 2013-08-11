@@ -78,7 +78,7 @@ def extract_text(infile):
     for part in parts:
         # Regexes
         multiple_newlines_re = re.compile(r'\n+')
-        height_re = re.compile(r'(GND|[0-9]+m \/ [0-9]+ft|FL[0-9]{2,3})')
+        height_re = re.compile(r'(GND|[0-9]+m \/ [0-9]+ft|FL[0-9]{2,3}|REF AIP)')
         center_radius_re = re.compile(r'([0-9]{6}N [0-9]{7}E)\s+?(.*?NM)')
 
         # Separate columns (warning: hackish code ahead!)
