@@ -3,6 +3,7 @@ from __future__ import print_function, division, absolute_import, unicode_litera
 
 import os
 import urllib
+import logging
 from datetime import datetime, timedelta
 
 import pytz
@@ -10,6 +11,8 @@ from bottle import route, run, request, response, static_file
 
 from .extraction import extract_map, extract_text, ExtractionError
 
+
+logging.basicConfig(level=logging.INFO)
 
 TEMPPATH = os.environ.get('TEMPPATH', os.path.abspath('.'))
 
@@ -37,6 +40,11 @@ class TargetDay(object):
     def datestring(self):
         return self.date.strftime('%Y%m%d')
 
+    @property
+    def prev_datestring(self):
+        """Return the datestring for the day before the current date."""
+        return (self.date - timedelta(1)).strftime('%Y%m%d')
+
 
 def get_filepath(day):
     return os.path.join(TEMPPATH, 'DABS_{0}.pdf'.format(day.datestring))
@@ -53,9 +61,23 @@ def download_dabs(day):
         The filepath of the DABS PDF.
 
     """
+    # Download file
     filepath = get_filepath(day)
     url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.datestring}.pdf'
-    urllib.urlretrieve(url.format(day=day), filepath)
+    _, http_msg = urllib.urlretrieve(url.format(day=day), filepath)
+
+    # If download isn't a PDF file, retry with previous date
+    if http_msg.subtype != 'pdf':
+        log_msg = 'Downloaded filetype is {0} instead of pdf, trying previous day...'
+        logging.info(log_msg.format(http_msg.subtype))
+
+        url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.prev_datestring}.pdf'
+        _, http_msg = urllib.urlretrieve(url.format(day=day), filepath)
+
+        # If it fails again, raise an exception
+        if http_msg.subtype != 'pdf':
+            raise RuntimeError('Could not find valid PDF download.')
+
     return filepath
 
 
