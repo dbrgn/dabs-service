@@ -43,7 +43,7 @@ Valid for text response only. Can be set using the ``Accept`` HTTP header.
 
 Fallback/default is HTML format.
 
-The ``.../map/`` will always return a PNG image.
+The ``.../map/`` will always return a JPG image.
 
 Example
 ~~~~~~~
