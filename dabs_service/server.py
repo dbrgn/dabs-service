@@ -10,7 +10,7 @@ import requests
 import bottle
 from bottle import run, request, response, static_file
 
-from .extraction import extract_map, extract_text, ExtractionError
+from .extraction import extract_map, compress_map, extract_text, ExtractionError
 from .lib.bottle_redis import RedisPlugin
 
 
@@ -140,14 +140,18 @@ def process_dabs(day, target, rdb, filepath=None, has_changed=True):
 
     # Handle map extraction
     if target == 'map':
-        imgfile = 'map_{0}.png'.format(day.datestring)
-        imgpath = os.path.join(TEMPPATH, imgfile)
-        if has_changed or not os.path.isfile(imgpath):
-            logging.info('Extracting map from PDF.')
-            extract_map(filepath, imgpath)
+        pngfile = 'map_{0}.png'.format(day.datestring)
+        jpgfile = 'map_{0}.jpg'.format(day.datestring)
+        pngpath = os.path.join(TEMPPATH, pngfile)
+        jpgpath = os.path.join(TEMPPATH, jpgfile)
+        if has_changed or not os.path.isfile(jpgpath):
+            logging.info('Extracting map from PDF...')
+            extract_map(filepath, pngpath)
+            logging.info('Compressing image...')
+            compress_map(pngpath, jpgpath)
         else:
             logging.info('Using cached map image.')
-        return static_file(imgfile, root=TEMPPATH, mimetype='image/png')
+        return static_file(jpgfile, root=TEMPPATH, mimetype='image/jpeg')
 
     # Handle text extraction
     # TODO caching

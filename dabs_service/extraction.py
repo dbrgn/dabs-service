@@ -20,16 +20,33 @@ def extract_map(infile, outfile):
         outfile:
             Path where to save the map PNG.
 
-    Returns:
-        True
-
     Raises:
         subprocess.CalledProcessError:
             Raised if extracting image from PDF file using mudraw fails.
 
     """
-    subprocess.check_call(['mudraw', '-w', '1920', '-h', '1920', '-o', outfile, infile, '1'])
-    return True
+    subprocess.check_call(['mudraw', '-w', '1800', '-h', '1800', '-o', outfile, infile, '1'])
+
+
+def compress_map(infile, outfile):
+    """Compress the map PNG to a smaller JPG version.
+
+    Args:
+        infile:
+            Path to PNG file.
+        outfile:
+            Path where to save JPG file.
+
+    Returns:
+        True
+
+    Raises:
+        subprocess.CalledProcessError:
+            Raised if compressing image using imagemagick fails.
+
+    """
+    cmd = ['convert', '-strip', '-interlace', 'Plane', '-quality', '85', infile, outfile]
+    subprocess.check_call(cmd)
 
 
 def extract_text(infile):
