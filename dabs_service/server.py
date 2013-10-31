@@ -2,11 +2,11 @@
 from __future__ import print_function, division, absolute_import, unicode_literals
 
 import os
-import urllib
 import logging
 from datetime import datetime, timedelta
 
 import pytz
+import requests
 from bottle import route, run, request, response, static_file
 
 from .extraction import extract_map, extract_text, ExtractionError
@@ -15,6 +15,10 @@ from .extraction import extract_map, extract_text, ExtractionError
 logging.basicConfig(level=logging.INFO)
 
 TEMPPATH = os.environ.get('TEMPPATH', os.path.abspath('.'))
+
+
+# Used to store ETag values
+etag = {}
 
 
 class TargetDay(object):
@@ -61,22 +65,47 @@ def download_dabs(day):
         The filepath of the DABS PDF.
 
     """
-    # Download file
+    # Prepare filepath and URL
     filepath = get_filepath(day)
     url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.datestring}.pdf'
-    _, http_msg = urllib.urlretrieve(url.format(day=day), filepath)
 
-    # If download isn't a PDF file, retry with previous date
-    if http_msg.subtype != 'pdf':
-        log_msg = 'Downloaded filetype is {0} instead of pdf, trying previous day...'
-        logging.info(log_msg.format(http_msg.subtype))
+    # Handle caching
+    global etag
+    headers = {}
+    if url in etag and os.path.isfile(filepath):
+        headers['If-None-Match'] = etag[url]
 
-        url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.prev_datestring}.pdf'
-        _, http_msg = urllib.urlretrieve(url.format(day=day), filepath)
+    # Request file
+    r = requests.get(url.format(day=day), headers=headers, stream=True)
 
-        # If it fails again, raise an exception
-        if http_msg.subtype != 'pdf':
-            raise RuntimeError('Could not find valid PDF download.')
+    # Download file if necessary
+    if r.status_code == requests.codes.not_modified:
+        logging.info("ETag didn't change, serving file directly.")
+    elif r.status_code == 200:
+        logging.info("Re-downloading file.")
+        with open(filepath, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive new chunks
+                    f.write(chunk)
+                    f.flush()
+        etag[url] = r.headers['etag']
+    else:
+        msg = 'Something went wrong (HTTP {0.status_code})'.format(r)
+        logging.error(msg)
+        response.status = 500
+        return unicode(msg)
+
+    # TODO: If download isn't a PDF file, retry with previous date
+    #if http_msg.subtype != 'pdf':
+    #    log_msg = 'Downloaded filetype is {0} instead of pdf, trying previous day...'
+    #    logging.info(log_msg.format(http_msg.subtype))
+
+    #    url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.prev_datestring}.pdf'
+    #    _, http_msg = urllib.urlretrieve(url.format(day=day), filepath)
+
+    #    # If it fails again, raise an exception
+    #    if http_msg.subtype != 'pdf':
+    #        raise RuntimeError('Could not find valid PDF download.')
 
     return filepath
 
@@ -159,7 +188,7 @@ def process_dabs(day, target, filepath=None):
 
 @route('/')
 def index():
-    return 'DABS webservice'
+    return 'DABS webservice.'
 
 
 @route('/today/<target>/')

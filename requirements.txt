@@ -3,3 +3,4 @@ tablib==0.9.11
 pytz==2013b
 gunicorn==17.5
 newrelic==1.13.1.31
+requests==2.0.1
