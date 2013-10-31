@@ -67,8 +67,7 @@ def download_dabs(day, rdb):
         (filepath, has_changed)
 
         - The filepath of the DABS PDF.
-        - Whether the PDF has changed or not. In the case of an error,
-          this is ``None``.
+        - Whether the PDF has changed or not.
 
     """
     # Prepare filepath and URL
@@ -85,8 +84,8 @@ def download_dabs(day, rdb):
 
     # Download file if necessary
     if r.status_code == requests.codes.not_modified:
-        logging.info("ETag didn't change, serving file directly.")
-        return filepath, True
+        logging.info("ETag didn't change, using cached file.")
+        return filepath, False
     elif r.status_code == 200:
         logging.info('Re-downloading file DABS_{d.datestring}.pdf'.format(d=day))
         with open(filepath, 'wb') as f:
@@ -95,12 +94,11 @@ def download_dabs(day, rdb):
                     f.write(chunk)
                     f.flush()
         rdb.set('etag_' + url, r.headers['etag'])
-        return filepath, False
+        return filepath, True
     else:
         msg = 'Something went wrong (HTTP {0.status_code})'.format(r)
         logging.error(msg)
-        response.status = 500
-        return unicode(msg), None
+        raise RuntimeError(msg)
 
     # TODO: If download isn't a PDF file, retry with previous date
     #if http_msg.subtype != 'pdf':
@@ -115,7 +113,7 @@ def download_dabs(day, rdb):
     #        raise RuntimeError('Could not find valid PDF download.')
 
 
-def process_dabs(day, target, rdb, filepath=None):
+def process_dabs(day, target, rdb, filepath=None, has_changed=True):
     """Process the specified DABS file. Return response content.
 
     Args:
@@ -123,9 +121,13 @@ def process_dabs(day, target, rdb, filepath=None):
             A ``TargetDay`` instance.
         target:
             Either ``map`` or ``text``.
+        rdb:
+            A ``redis.StrictRedis`` instance.
         filepath:
             Optional. Filepath to the DABS PDF file. If no ``filepath`` is
             specified, it is calculated using the ``day`` parameter.
+        has_changed:
+            Optional. Whether the DABS PDF has changed or not. Default ``True``.
 
     Returns:
         Response content. Content type is also set using the global response
@@ -138,11 +140,17 @@ def process_dabs(day, target, rdb, filepath=None):
 
     # Handle map extraction
     if target == 'map':
-        map_filename = 'map_{0}.png'.format(day.datestring)
-        extract_map(filepath, os.path.join(TEMPPATH, map_filename))
-        return static_file(map_filename, root=TEMPPATH, mimetype='image/png')
+        imgfile = 'map_{0}.png'.format(day.datestring)
+        imgpath = os.path.join(TEMPPATH, imgfile)
+        if has_changed or not os.path.isfile(imgpath):
+            logging.info('Extracting map from PDF.')
+            extract_map(filepath, imgpath)
+        else:
+            logging.info('Using cached map image.')
+        return static_file(imgfile, root=TEMPPATH, mimetype='image/png')
 
     # Handle text extraction
+    # TODO caching
     elif target == 'text':
         try:
             data = extract_text(filepath)
@@ -203,8 +211,12 @@ def today(target, rdb):
     :type rdb: redis.StrictRedis
     """
     day = TargetDay('today')
-    filepath, has_changed = download_dabs(day, rdb)
-    return process_dabs(day, target, rdb, filepath)
+    try:
+        filepath, has_changed = download_dabs(day, rdb)
+    except RuntimeError as e:
+        response.status = 500
+        return unicode(e)
+    return process_dabs(day, target, rdb, filepath, has_changed)
 
 
 @app.route('/tomorrow/<target>/')
@@ -214,8 +226,12 @@ def tomorrow(target, rdb):
     :type rdb: redis.StrictRedis
     """
     day = TargetDay('tomorrow')
-    filepath, has_changed = download_dabs(day, rdb)
-    return process_dabs(day, target, rdb, filepath)
+    try:
+        filepath, has_changed = download_dabs(day, rdb)
+    except RuntimeError as e:
+        response.status = 500
+        return unicode(e)
+    return process_dabs(day, target, rdb, filepath, has_changed)
 
 
 if __name__ == '__main__':
