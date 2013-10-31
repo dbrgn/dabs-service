@@ -7,18 +7,20 @@ from datetime import datetime, timedelta
 
 import pytz
 import requests
-from bottle import route, run, request, response, static_file
+import bottle
+from bottle import run, request, response, static_file
 
 from .extraction import extract_map, extract_text, ExtractionError
+from .lib.bottle_redis import RedisPlugin
 
 
 logging.basicConfig(level=logging.INFO)
 
 TEMPPATH = os.environ.get('TEMPPATH', os.path.abspath('.'))
 
-
-# Used to store ETag values
-etag = {}
+app = bottle.Bottle()
+plugin = RedisPlugin(os.environ.get('REDISCLOUD_URL', 'redis://localhost/3'))
+app.install(plugin)
 
 
 class TargetDay(object):
@@ -54,7 +56,7 @@ def get_filepath(day):
     return os.path.join(TEMPPATH, 'DABS_{0}.pdf'.format(day.datestring))
 
 
-def download_dabs(day):
+def download_dabs(day, rdb):
     """Download the DABS PDF.
 
     Args:
@@ -62,38 +64,43 @@ def download_dabs(day):
             Either ``today`` or ``tomorrow``.
 
     Returns:
-        The filepath of the DABS PDF.
+        (filepath, has_changed)
+
+        - The filepath of the DABS PDF.
+        - Whether the PDF has changed or not. In the case of an error,
+          this is ``None``.
 
     """
     # Prepare filepath and URL
     filepath = get_filepath(day)
-    url = 'http://www.skyguide.ch/fileadmin/dabs-{day.name}/DABS_{day.datestring}.pdf'
+    url = 'http://www.skyguide.ch/fileadmin/dabs-{d.name}/DABS_{d.datestring}.pdf'.format(d=day)
 
     # Handle caching
-    global etag
     headers = {}
-    if url in etag and os.path.isfile(filepath):
-        headers['If-None-Match'] = etag[url]
+    if rdb.exists('etag_' + url) and os.path.isfile(filepath):
+        headers['If-None-Match'] = rdb.get('etag_' + url)
 
     # Request file
-    r = requests.get(url.format(day=day), headers=headers, stream=True)
+    r = requests.get(url, headers=headers, stream=True)
 
     # Download file if necessary
     if r.status_code == requests.codes.not_modified:
         logging.info("ETag didn't change, serving file directly.")
+        return filepath, True
     elif r.status_code == 200:
-        logging.info("Re-downloading file.")
+        logging.info('Re-downloading file DABS_{d.datestring}.pdf'.format(d=day))
         with open(filepath, 'wb') as f:
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:  # filter out keep-alive new chunks
                     f.write(chunk)
                     f.flush()
-        etag[url] = r.headers['etag']
+        rdb.set('etag_' + url, r.headers['etag'])
+        return filepath, False
     else:
         msg = 'Something went wrong (HTTP {0.status_code})'.format(r)
         logging.error(msg)
         response.status = 500
-        return unicode(msg)
+        return unicode(msg), None
 
     # TODO: If download isn't a PDF file, retry with previous date
     #if http_msg.subtype != 'pdf':
@@ -107,10 +114,8 @@ def download_dabs(day):
     #    if http_msg.subtype != 'pdf':
     #        raise RuntimeError('Could not find valid PDF download.')
 
-    return filepath
 
-
-def process_dabs(day, target, filepath=None):
+def process_dabs(day, target, rdb, filepath=None):
     """Process the specified DABS file. Return response content.
 
     Args:
@@ -186,28 +191,36 @@ def process_dabs(day, target, filepath=None):
         return 'Invalid target: "{0}"'.format(target)
 
 
-@route('/')
+@app.route('/')
 def index():
     return 'DABS webservice.'
 
 
-@route('/today/<target>/')
-def today(target):
+@app.route('/today/<target>/')
+def today(target, rdb):
+    """
+    :param rdb: Redis instance.
+    :type rdb: redis.StrictRedis
+    """
     day = TargetDay('today')
-    filepath = download_dabs(day)
-    return process_dabs(day, target, filepath)
+    filepath, has_changed = download_dabs(day, rdb)
+    return process_dabs(day, target, rdb, filepath)
 
 
-@route('/tomorrow/<target>/')
-def tomorrow(target):
+@app.route('/tomorrow/<target>/')
+def tomorrow(target, rdb):
+    """
+    :param rdb: Redis instance.
+    :type rdb: redis.StrictRedis
+    """
     day = TargetDay('tomorrow')
-    filepath = download_dabs(day)
-    return process_dabs(day, target, filepath)
+    filepath, has_changed = download_dabs(day, rdb)
+    return process_dabs(day, target, rdb, filepath)
 
 
 if __name__ == '__main__':
     if os.environ.get('USE_GUNICORN', '').lower() in ['y', 'yes', '1', 'true']:
         port = int(os.environ.get('PORT', 8000))
-        run(server='gunicorn', host='0.0.0.0', port=port)
+        run(app, server='gunicorn', host='0.0.0.0', port=port)
     else:
-        run(host='0.0.0.0', port=8000)
+        run(app, host='0.0.0.0', port=8000)
