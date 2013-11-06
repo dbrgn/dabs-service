@@ -28,8 +28,10 @@ def map_filepath():
 
 
 def test_map_extraction(dabs_filepath, map_filepath):
-    retval = extraction.extract_map(dabs_filepath, map_filepath)
-    assert retval is True
+    try:
+        retval = extraction.extract_map(dabs_filepath, map_filepath)
+    except subprocess.CalledProcessError:
+        pytest.fail()
     filetype = subprocess.check_output(['file', map_filepath])
     assert 'PNG image data' in filetype
 
