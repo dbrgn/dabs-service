@@ -1,8 +1,8 @@
-bottle==0.11.6
+bottle==0.12.7
 tablib==0.9.11
-pytz==2013b
-gunicorn==17.5
+pytz==2014.3
+gunicorn==18.0
 newrelic==1.13.1.31
-requests==2.0.1
-redis==2.8.0
+requests==2.3
+redis==2.9.1
 bottle-redis==0.2.1
