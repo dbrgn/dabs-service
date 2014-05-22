@@ -76,9 +76,10 @@ def extract_text(infile):
             re.MULTILINE | re.DOTALL)
     if not match:
         raise ExtractionError('Could not extract text from PDF.')
+    false_or_none_string = lambda x: bool(x) and x.lower() != 'none'
     data = '\n\n\n'.join(match.groups())
     raw_parts = re.sub(r'\n[ \t]+\n', '\n\n', data).split('\n\n\n')
-    parts = filter(None, map(lambda x: x.strip(), raw_parts))
+    parts = filter(false_or_none_string, map(lambda x: x.strip(), raw_parts))
 
     # Write CSV
     headers = (
@@ -92,7 +93,7 @@ def extract_text(infile):
         b'Activity / Remarks',
     )
     rows = []
-    for part in parts:
+    for i, part in enumerate(parts):
         # Regexes
         multiple_newlines_re = re.compile(r'\n+')
         height_re = re.compile(r'(GND|[0-9]+m \/ [0-9]+ft|FL[0-9]{2,3}|REF AIP)')
