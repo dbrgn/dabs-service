@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 TEMPPATH = os.environ.get('TEMPPATH', os.path.abspath('.'))
 
 app = bottle.Bottle()
-plugin = RedisPlugin(os.environ.get('REDISCLOUD_URL', 'redis://localhost/3'))
+plugin = RedisPlugin(os.environ.get('REDIS_URL', 'redis://localhost/3'))
 app.install(plugin)
 
 

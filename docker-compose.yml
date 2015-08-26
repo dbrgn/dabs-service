@@ -1,0 +1,13 @@
+redis:
+  image: redis
+  restart: always
+
+app:
+  build: .
+  restart: always
+  ports:
+    - 8000:8000
+  links:
+    - redis
+  environment:
+    REDIS_URL: redis://redis/1

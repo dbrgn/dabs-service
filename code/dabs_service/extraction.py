@@ -65,7 +65,7 @@ def extract_text(infile):
 
     """
     # Get text from mudraw
-    text = subprocess.check_output(['mudraw', '-t', infile])
+    text = subprocess.check_output(['mudraw', '-F', 'txt', infile])
 
     # Cleanup raw text
     match = re.search(
