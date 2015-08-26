@@ -6,7 +6,7 @@ install:
     - pip install -r requirements.txt --use-mirrors
     - pip install pytest pytest-pep8 pytest-cov --use-mirrors
 script:
-    - py.test
+    - cd code && py.test
 after_script:
     - pip install --quiet --use-mirrors coveralls
-    - coveralls
+    - cd code && coveralls
