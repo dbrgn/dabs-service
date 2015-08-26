@@ -18,10 +18,17 @@ RUN cd /tmp \
 COPY requirements.txt /tmp/
 RUN pip install -r /tmp/requirements.txt
 
+# Add user
+RUN adduser --disabled-password --gecos "" dabs
+
 # Add code
 RUN mkdir /code
 COPY code /code
 
+# Fix permissions
+RUN chown -R dabs:dabs /code
+
 # Entry point
 WORKDIR /code
+USER dabs
 CMD ["python", "-m", "dabs_service.server"]
